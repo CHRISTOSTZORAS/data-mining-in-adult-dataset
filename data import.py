@@ -115,36 +115,33 @@ income.loc[:, 'income'] = income['income'].replace({'<=50K.': '<=50K', '>50K.': 
 # We will definitely normalize  age,weight, education number, and hours per week.
 # However, we will  normalizing capital gain and capital loss with log scaling because we observed that they contain many zero values and many outliers.
 # Using Min-Max Scaling in this case would create a numerical variable centered around zero with several extreme values.
-columns_to_normalize = ["age","fnlwgt", "education-num", "hours-per-week"]
+columns_to_normalize = ["age", "fnlwgt", "education-num", "hours-per-week"]
 scaler = MinMaxScaler()
-other_variables[columns_to_normalize] = scaler.fit_transform(other_variables[columns_to_normalize])
+other_variables.loc[:, columns_to_normalize] = scaler.fit_transform(other_variables[columns_to_normalize])
 
 columns_to_log_scale = ["capital-gain", "capital-loss"]
 for col in columns_to_log_scale:
-    other_variables[col] = np.log1p(other_variables[col])
+    other_variables.loc[:, col] = np.log1p(other_variables[col])
 
 
 
 #now we will also use label encoding to our nominal variables 
-categorical_columns=['workclass','education','marital-status','occupation','relationship',
-                     'race','sex','native-country']
+categorical_columns = ['workclass', 'education', 'marital-status', 'occupation', 
+                       'relationship', 'race', 'sex', 'native-country']
 label_encoders = {}
 for col in categorical_columns:
     le = LabelEncoder()
-    other_variables[col] = le.fit_transform(other_variables[col]) 
+    other_variables.loc[:, col] = le.fit_transform(other_variables[col])  # Χρήση .loc για να αποφύγουμε το Warning
     label_encoders[col] = le  
-    
-#making a df of encodings to help us in future cases
-encoding_mappings = {}
-for col in categorical_columns:
-    encoding_mappings[col] = {category: i for i, category in enumerate(label_encoders[col].classes_)}
+encoding_mappings = {col: {category: i for i, category in enumerate(label_encoders[col].classes_)} 
+                     for col in categorical_columns}
+
 encoding_df = pd.DataFrame.from_dict(encoding_mappings, orient="index").transpose()
-
 income_encoder = LabelEncoder()
-income_encoded = income_encoder.fit_transform(income.values.ravel())
-income = pd.DataFrame(income_encoded, columns=['income'])
+income_encoded = income_encoder.fit_transform(income.values.ravel())  # Μετατροπή σε 1D array
+income = pd.DataFrame(income_encoded, columns=['income'])  # Μετατροπή σε DataFrame
 label_encoders['income'] = income_encoder
-
+# print(income)
 
 #data reduction.
 
@@ -167,15 +164,16 @@ print(f"Number of selected principal components: {num_components}")
 print(finaldf)
 
 
+
 ###SECOND EXERCISE###
 
 #Future Selection.
 
 #Feature Selection using SelectKBest
 features = other_variables
-target= income
+target = income.values.ravel()
 selector = SelectKBest(score_func=f_classif, k=5) 
-features_new = selector.fit_transform(x, y)
+features_new = selector.fit_transform(features, target)
 selected_features_kbest = features.columns[selector.get_support()]
 selected_features_df = pd.DataFrame({
     "Method": ["SelectKBest"] * 5 ,
@@ -409,13 +407,13 @@ print(results_df)
 ###FORTH EXERCISE###
 X = other_variables.copy()  # Features
 y = income.values.ravel() # Target variable
-
+pd.Series(y).value_counts()
 # Split dataset into 80% training and 20% testing
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 models = {
-    "Logistic Regression": LogisticRegression(max_iter=500),
-    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
-    "Support Vector Machine": SVC(),
+    "Logistic Regression": LogisticRegression(max_iter=500, class_weight='balanced'),
+    "Random Forest": RandomForestClassifier(n_estimators=300, random_state=42, class_weight='balanced'),
+    "Support Vector Machine": SVC(class_weight='balanced'),
     "Gradient Boosting": GradientBoostingClassifier(n_estimators=100, random_state=42)
 }
 
@@ -450,43 +448,43 @@ for model_name, model in models.items():
 machine_learning_results_df = pd.DataFrame(results)
 print(machine_learning_results_df)
 
-# 📌 1️⃣ Ανάλυση Confusion Matrices
-# Οι confusion matrices δείχνουν πόσο καλά τα μοντέλα προβλέπουν τις δύο κατηγορίες (<=50K και >50K).
+# Οι confusion matrices δείχνουν την απόδοση κάθε μοντέλου σε δύο κατηγορίες:
 
-# 🔹 Logistic Regression, SVM και Gradient Boosting
-# Δεν προβλέπουν καθόλου την κατηγορία >50K!
-# Όλα τα δείγματα ταξινομούνται ως <=50K.
-# Αυτό σημαίνει ότι τα μοντέλα έχουν σοβαρό πρόβλημα ανισορροπίας δεδομένων και καταλήγουν να προβλέπουν μόνο την πλειοψηφική κλάση.
+# <=50K (Χαμηλό Εισόδημα)
+# >50K (Υψηλό Εισόδημα)
+# 🔹 Logistic Regression
+# True Positives (TP) = 2934
+# False Negatives (FN) = 0 (άρα δεν προβλέπει σχεδόν καθόλου σωστά το >50K)
+# False Positives (FP) = 2934 (πολλά λάθος predictions για <=50K)
+# Accuracy = 54.2% (χαμηλό)
+# 📌 Συμπέρασμα: Το Logistic Regression δεν αποδίδει καλά, καθώς μπερδεύει αρκετά τις κατηγορίες και έχει χαμηλό Accuracy.
+
 # 🔹 Random Forest
-# Κάνει τουλάχιστον κάποιες σωστές προβλέψεις για >50K (202 σωστές από 2234).
-# Παρόλα αυτά, έχει ακόμα πολύ υψηλά false negatives (2032 άτομα με εισόδημα >50K ταξινομήθηκαν λάθος ως <=50K).
-# Αν και δεν είναι τέλειο, είναι το μόνο μοντέλο που προσπαθεί να διαχωρίσει τις δύο κλάσεις.
-# 🔹 Παρατηρήσεις
-# Το Accuracy είναι παρόμοιο για όλα τα μοντέλα (~75%), αλλά αυτό δεν σημαίνει ότι είναι καλό.
+# True Positives (TP) = 809 (λίγες σωστές προβλέψεις >50K)
+# False Negatives (FN) = 0 (ακόμα σημαντικό πρόβλημα)
+# Accuracy = 69.7% (μέτριο)
+# 📌 Συμπέρασμα: Το Random Forest είναι σημαντικά καλύτερο από το Logistic Regression, αλλά δυσκολεύεται ακόμα να προβλέψει τα άτομα με υψηλό εισόδημα.
 
-# Όταν υπάρχει ανισορροπία στις κλάσεις, η ακρίβεια μπορεί να είναι υψηλή απλά επειδή το μοντέλο μαντεύει πάντα την πλειοψηφική κλάση.
-# Το Precision του Random Forest (0.636) είναι το υψηλότερο, που σημαίνει ότι κάνει καλύτερες σωστές προβλέψεις για την κατηγορία >50K.
+# 🔹 Support Vector Machine (SVM)
+# True Positives (TP) = 1693 (καλύτερη απόδοση στο >50K)
+# False Negatives (FN) = 0 (καμία σωστή πρόβλεψη για >50K)
+# Accuracy = 63.5% (μέτριο)
+# 📌 Συμπέρασμα: Το SVM αποδίδει λίγο καλύτερα από το Logistic Regression, αλλά δεν διαχωρίζει καλά τις δύο κατηγορίες.
 
-# Το Recall είναι πολύ χαμηλό για τα περισσότερα μοντέλα, δείχνοντας ότι τα μοντέλα αποτυγχάνουν να εντοπίσουν αρκετά άτομα με εισόδημα >50K.
+# 🔹 Gradient Boosting
+# True Positives (TP) = 2 (ουσιαστικά αποτυγχάνει να προβλέψει την κατηγορία >50K)
+# False Negatives (FN) = 0
+# Accuracy = 75.7% (υψηλό)
+# 📌 Συμπέρασμα: Παρόλο που έχει το υψηλότερο Accuracy, δεν προβλέπει σχεδόν καθόλου σωστά την κατηγορία >50K, που είναι μεγάλο πρόβλημα
 
-# Τα Logistic Regression, SVM και Gradient Boosting έχουν το ίδιο ακριβώς πρόβλημα:
-
-# Μαθαίνουν να προβλέπουν μόνο την πλειοψηφική κατηγορία (<=50K).
-# Το F1-Score τους είναι σχετικά χαμηλό.
-
-# ✅ Τι δουλεύει καλά
-# Το Random Forest έχει την καλύτερη απόδοση συνολικά.
-# Είναι το μόνο μοντέλο που κάνει κάποιες σωστές προβλέψεις για την κατηγορία >50K.
-# ❌ Τι δεν δουλεύει καλά
-# Τα περισσότερα μοντέλα δεν καταφέρνουν να προβλέψουν την κατηγορία >50K.
-# Η απόδοση του ταξινομητή είναι επηρεασμένη από την ανισορροπία του dataset.
-# Η κατηγορία >50K είναι υποεκπροσωπημένη και τα μοντέλα μαθαίνουν να αγνοούν αυτήν την κλάση.
 
 from imblearn.over_sampling import SMOTE
+import sklearn
+import imblearn
 
 # Εφαρμογή SMOTE για την εξισορρόπηση των κλάσεων
 smote = SMOTE(random_state=42)
-X_resampled, y_resampled = smote.fit_resample(X_train_scaled, y_train)
+X_resampled, y_resampled = smote.fit_resample(X_train, y_train)
 
 # Επιβεβαίωση της νέας κατανομής των κλάσεων
 unique, counts = np.unique(y_resampled, return_counts=True)
@@ -500,7 +498,7 @@ for model_name, model in models.items():
     model.fit(X_resampled, y_resampled)
     
     # Πρόβλεψη στο test set
-    y_pred_smote = model.predict(X_test_scaled)
+    y_pred_smote = model.predict(X_test)
     
     # Αξιολόγηση αποτελεσμάτων
     accuracy = accuracy_score(y_test, y_pred_smote)
@@ -523,3 +521,216 @@ for model_name, model in models.items():
 # Προβολή αποτελεσμάτων μετά την εφαρμογή SMOTE
 new_machine_learing_results_df = pd.DataFrame(new_results)
 print(new_machine_learing_results_df)
+
+# 1️⃣ Logistic Regression (Παλινδρόμηση)
+# 📊 Confusion Matrix
+
+# 3721 σωστές προβλέψεις για <=50K (True Negatives)
+# 3252 λανθασμένες προβλέψεις όπου <=50K προβλέφθηκαν ως >50K
+# 0 σωστές προβλέψεις για >50K (False Negatives)
+# Η ακρίβεια έπεσε στο 51.9%
+# 🔍 Ανάλυση
+
+# Ο ταξινομητής κάνει πάρα πολλά λάθη στην κατηγορία >50K.
+# Πιθανότατα δεν μπορεί να προσαρμοστεί σωστά στα νέα δεδομένα που δημιούργησε το SMOTE.
+# Γενικά, η Logistic Regression δεν είναι τόσο ισχυρός ταξινομητής για περίπλοκα προβλήματα.
+# 🛠 Τι μπορούμε να κάνουμε;
+
+# Δοκιμή διαφορετικών κανονικοποιήσεων ή διαγραφή περιττών χαρακτηριστικών.
+# 2️⃣ Random Forest
+# 📊 Confusion Matrix
+
+# 5542 σωστές προβλέψεις για <=50K
+# 1431 λανθασμένες προβλέψεις για <=50K
+# Η ακρίβεια βελτιώθηκε στο 65.4% (συγκριτικά με πριν)
+# 🔍 Ανάλυση
+
+# Το Random Forest ανταποκρίθηκε πολύ καλύτερα από τη Logistic Regression.
+# Έχει περισσότερη ισορροπία στις προβλέψεις, αλλά ακόμα υπάρχουν λάθη.
+# 🛠 Τι μπορούμε να κάνουμε;
+
+# Αύξηση του αριθμού των δέντρων (n_estimators).
+# Δοκιμή διαφορετικών υπερπαραμέτρων (max_depth, min_samples_split, κτλ.).
+# 3️⃣ Support Vector Machine
+# 📊 Confusion Matrix
+
+# 4227 σωστές προβλέψεις για <=50K
+# 2746 λανθασμένες προβλέψεις για <=50K
+# Ακρίβεια στο 55.2%
+# 🔍 Ανάλυση
+
+# Ακόμα πολλά λάθη και στις δύο κατηγορίες.
+# Ο αλγόριθμος δεν ανταποκρίθηκε καλά στο SMOTE.
+# 🛠 Τι μπορούμε να κάνουμε;
+
+# Δοκιμή διαφορετικών kernels (RBF, polynomial).
+# Ρύθμιση της παραμέτρου C.
+# 4️⃣ Gradient Boosting
+# 📊 Confusion Matrix
+
+# 6362 σωστές προβλέψεις για <=50K
+# 611 λανθασμένες προβλέψεις για <=50K
+# Η καλύτερη ακρίβεια στο 71.1%!
+# 🔍 Ανάλυση
+
+# Το Gradient Boosting αποδίδει το καλύτερο αποτέλεσμα.
+# Έχει την υψηλότερη ακρίβεια, recall και F1-score.
+# 🛠 Τι μπορούμε να κάνουμε;
+
+# Αύξηση των n_estimators.
+# Δοκιμή Learning Rate (μείωση για καλύτερη γενίκευση)
+####βλεςπουμε οτι ουτε με την εξσισοροπηση δεδομενων βγαζουμε καρη οποτε παμε να δοκιμασουμε μονο τις 5 μεταβλητες απο το select k best
+selected_features_kbest = ["education-num", "marital-status", "race", "capital-gain", "native-country"]
+X_selected = other_variables[selected_features_kbest]
+X_train, X_test, y_train, y_test = train_test_split(X_selected, income.values.ravel(), test_size=0.2, random_state=42)
+
+models = {
+    "Logistic Regression": LogisticRegression(max_iter=500),
+    "Random Forest": RandomForestClassifier(n_estimators=300, random_state=42),
+    "Support Vector Machine": SVC(),
+    "Gradient Boosting": GradientBoostingClassifier(n_estimators=100, random_state=42)
+}
+
+results = []
+
+for model_name, model in models.items():
+    # Εκπαίδευση με τα νέα δεδομένα
+    model.fit(X_train, y_train)
+    
+    # Πρόβλεψη στο test set
+    y_pred = model.predict(X_test)
+    
+    # Αξιολόγηση αποτελεσμάτων
+    accuracy = accuracy_score(y_test, y_pred)
+    precision = classification_report(y_test, y_pred, output_dict=True)["weighted avg"]["precision"]
+    recall = classification_report(y_test, y_pred, output_dict=True)["weighted avg"]["recall"]
+    f1 = classification_report(y_test, y_pred, output_dict=True)["weighted avg"]["f1-score"]
+    
+    # Αποθήκευση αποτελεσμάτων
+    results.append({"Model": model_name, "Accuracy": accuracy, "Precision": precision, "Recall": recall, "F1-Score": f1})
+    
+    # Confusion Matrix
+    cm = confusion_matrix(y_test, y_pred)
+    plt.figure(figsize=(5,4))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=["<=50K", ">50K"], yticklabels=["<=50K", ">50K"])
+    plt.xlabel("Predicted Label")
+    plt.ylabel("True Label")
+    plt.title(f"Confusion Matrix - {model_name} (5best)")
+    plt.show()
+
+# Προβολή των αποτελεσμάτων
+results_df_5best = pd.DataFrame(results)
+print(results_df_5best)
+#oute edw vriskoume kapoio montelo pou na einai deleastiko
+# 1️⃣ Feature Selection with SelectKBest
+# You used SelectKBest to reduce the number of features to the top 5 most relevant based on their correlation with the target.
+# The models trained on these selected features show an accuracy comparable to those trained on the full dataset.
+# However, the confusion matrices indicate that some models perform extremely poorly in predicting the ">50K" class.
+# 2️⃣ Confusion Matrices (5 Best Features)
+# Logistic Regression, SVM: These models completely fail to predict the ">50K" class (no values in the true positive quadrant).
+# Random Forest & Gradient Boosting: Show minor improvements in detecting the ">50K" class, but the number of false negatives remains high.
+# 🔴 Interpretation:
+
+# The drastic class imbalance is likely causing these models to be biased towards predicting only "<=50K".
+# The removal of important features might have stripped away crucial information needed to separate the two income classes effectively.
+#  Observations:
+
+# Accuracy is not significantly affected by the feature reduction.
+# Gradient Boosting shows the highest Precision (0.677), indicating it is more confident in its positive predictions.
+# Random Forest shows similar performance to the full-feature model, meaning it still retains good predictive power.
+
+#συνολικο συμπερασμα 
+# Με βάση τα αποτελέσματα των τριών διαφορετικών προσεγγίσεων (αρχικά δεδομένα, εξισορροπημένα με SMOTE, και χρήση των 5 καλύτερων χαρακτηριστικών), η καλύτερη επιλογή εξαρτάται από την προτεραιότητά σου.
+
+# Αν δίνουμε έμφαση στην ακρίβεια (Accuracy):
+
+# Gradient Boosting στις αρχικές συνθήκες και με τα 5 καλύτερα χαρακτηριστικά έχει την υψηλότερη ακρίβεια (0.757).
+# Random Forest επίσης έχει καλή ακρίβεια, αλλά χαμηλότερη από το Gradient Boosting.
+# Αν δίνουμε έμφαση στην ανάκληση (Recall) για την ανίχνευση των υψηλών εισοδημάτων (>50K):
+
+# Μετά την εφαρμογή του SMOTE, το Logistic Regression και το Random Forest έχουν καλύτερη ισορροπία recall, αλλά μειωμένη ακρίβεια.
+# Αν δίνουμε έμφαση στην ισορροπία μεταξύ ακρίβειας και ανάκλησης (F1-score):
+
+# Gradient Boosting διατηρεί την υψηλότερη F1-score στις περισσότερες περιπτώσεις.
+# Τελική επιλογή:
+# Gradient Boosting χωρίς SMOTE και χωρίς τη μείωση χαρακτηριστικών (με όλα τα features).
+
+# Έχει την καλύτερη συνολική απόδοση, με υψηλή ακρίβεια, recall, precision και F1-score.
+# Δεν χάνει πληροφορία από το dataset.
+# Αν όμως δίνεις έμφαση στο να μειώσεις τη διάσταση των δεδομένων και να βελτιώσεις την ταχύτητα, τότε η επιλογή του Random Forest με τα 5 καλύτερα χαρακτηριστικά είναι καλή εναλλακτική, καθώς κρατάει αξιοπρεπή ακρίβεια χωρίς περιττά χαρακτηριστικά.
+#παμε τωρα με το gradient boosting να προσπαθησουμε να ο βελτιστοποιησουμε
+from sklearn.model_selection import GridSearchCV
+X = other_variables.copy()  # Features
+y = income.values.ravel()  # Target variable
+
+# Split dataset into 80% training and 20% testing
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Ορισμός του Gradient Boosting Classifier
+gb = GradientBoostingClassifier(random_state=42)
+
+# Ορισμός του grid για hyperparameter tuning
+param_grid = {
+    'n_estimators': [100, 300, 500],
+    'learning_rate': [0.01, 0.1, 0.2],
+    'max_depth': [3, 5, 7],
+    'min_samples_split': [2, 5, 10],
+    'subsample': [0.8, 1.0]
+}
+
+# GridSearchCV για την εύρεση των καλύτερων παραμέτρων
+grid_search = GridSearchCV(gb, param_grid, cv=3, scoring='f1', n_jobs=-1, verbose=2)
+grid_search.fit(X_train, y_train)
+
+# Καλύτερες παράμετροι
+best_params = grid_search.best_params_
+best_params
+# {'learning_rate': 0.2,
+#  'max_depth': 7,
+#  'min_samples_split': 10,
+#  'n_estimators': 500,
+#  'subsample': 0.8}
+
+#δοκιμη τνω καλυερων παραμετρων 
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
+best_gb = GradientBoostingClassifier(
+    learning_rate=0.2,
+    max_depth=7,
+    min_samples_split=10,
+    n_estimators=500,
+    subsample=0.8,
+    random_state=42
+)
+
+# Εκπαίδευση του βελτιωμένου μοντέλου
+best_gb.fit(X_train, y_train)
+
+# Πρόβλεψη στο test set
+y_pred_gb = best_gb.predict(X_test)
+
+# Υπολογισμός μετρικών απόδοσης
+accuracy = accuracy_score(y_test, y_pred_gb)
+precision = precision_score(y_test, y_pred_gb)
+recall = recall_score(y_test, y_pred_gb)
+f1 = f1_score(y_test, y_pred_gb)
+
+# Εμφάνιση των αποτελεσμάτων
+print(f"Βελτιστοποιημένο Gradient Boosting Performance:")
+print(f"Accuracy: {accuracy:.4f}")
+print(f"Precision: {precision:.4f}")
+print(f"Recall: {recall:.4f}")
+print(f"F1 Score: {f1:.4f}")
+
+# Εμφάνιση Confusion Matrix
+cm = confusion_matrix(y_test, y_pred_gb)
+plt.figure(figsize=(5,4))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=["<=50K", ">50K"], yticklabels=["<=50K", ">50K"])
+plt.xlabel("Predicted Label")
+plt.ylabel("True Label")
+plt.title(f"Confusion Matrix - Optimized Gradient Boosting")
+plt.show()
+#done with 4 ,no best params first gradient boosting correct
+
+
+
+
