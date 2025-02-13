@@ -19,6 +19,7 @@ from sklearn.metrics import silhouette_score
 from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from scipy.stats import zscore
+import tensorflow as tf
 
 adult = fetch_ucirepo(id=2) 
 # data importing
@@ -388,7 +389,7 @@ print("\n📊 Final Results Summary:")
 print(machine_learning_results_df)
 
 ###Fifth EXERCISE###
-import tensorflow as tf
+
 new_feature = ["age", "education-num", "hours-per-week", 'workclass', 'education', 
                'marital-status', 'occupation', 'relationship', 'race', 'sex', 
                'native-country', 'capital-gain', 'capital-loss']
