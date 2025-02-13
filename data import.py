@@ -268,35 +268,38 @@ print(silhouette_scores)
 
 #we will try for k=3 and for k=4 to see what is happening
 cluster_numbers = [3, 4]
-silhouette_scores3_4 = {"Algorithm": [], "Clusters": [], "Silhouette Score": []}
+silhouette_scores = {"Algorithm": [], "Clusters": [], "Silhouette Score": []}
+
 pca = PCA(n_components=2)
 X_pca = pca.fit_transform(X_clustering)
 fig, axes = plt.subplots(len(cluster_numbers), 2, figsize=(14, 6 * len(cluster_numbers)))
 
 for idx, k in enumerate(cluster_numbers):
-    #K-Means
-    kmeans3_4 = KMeans(n_clusters=k, random_state=42, n_init=10)
-    kmeans_labels3_4 = kmeans3_4.fit_predict(X_clustering)
-    silhouette_kmeans3_4 = silhouette_scores3_4(X_clustering, kmeans_labels3_4)
+    # K-Means Clustering
+    kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
+    kmeans_labels = kmeans.fit_predict(X_clustering)
+    silhouette_kmeans = silhouette_score(X_clustering, kmeans_labels)  # FIXED
 
-    #Agglomerative Clustering
+    # Agglomerative Clustering
     agglo = AgglomerativeClustering(n_clusters=k)
     agglo_labels = agglo.fit_predict(X_clustering)
     silhouette_agglo = silhouette_score(X_clustering, agglo_labels)
+
+    # Store silhouette scores
     silhouette_scores["Algorithm"].extend(["K-Means", "Agglomerative"])
     silhouette_scores["Clusters"].extend([k, k])
     silhouette_scores["Silhouette Score"].extend([silhouette_kmeans, silhouette_agglo])
 
-    #Scatter plot  K-Means
+    # Scatter plot for K-Means
     sns.scatterplot(x=X_pca[:, 0], y=X_pca[:, 1], hue=kmeans_labels, palette="viridis", ax=axes[idx, 0], s=10)
-    axes[idx, 0].set_title(f"K-Means Clustering με k={k}\nSilhouette Score: {silhouette_kmeans:.4f}")
+    axes[idx, 0].set_title(f"K-Means Clustering with k={k}\nSilhouette Score: {silhouette_kmeans:.4f}")
     axes[idx, 0].set_xlabel("Principal Component 1")
     axes[idx, 0].set_ylabel("Principal Component 2")
     axes[idx, 0].legend(title="Clusters")
 
-    #Scatter plot Agglomerative Clustering
+    # Scatter plot for Agglomerative Clustering
     sns.scatterplot(x=X_pca[:, 0], y=X_pca[:, 1], hue=agglo_labels, palette="magma", ax=axes[idx, 1], s=10)
-    axes[idx, 1].set_title(f"Agglomerative Clustering με k={k}\nSilhouette Score: {silhouette_agglo:.4f}")
+    axes[idx, 1].set_title(f"Agglomerative Clustering with k={k}\nSilhouette Score: {silhouette_agglo:.4f}")
     axes[idx, 1].set_xlabel("Principal Component 1")
     axes[idx, 1].set_ylabel("Principal Component 2")
     axes[idx, 1].legend(title="Clusters")
@@ -304,6 +307,7 @@ for idx, k in enumerate(cluster_numbers):
 plt.tight_layout()
 plt.show()
 
+# Convert silhouette scores to DataFrame
 results_df = pd.DataFrame(silhouette_scores)
 print(results_df)
 
@@ -392,55 +396,47 @@ new_feature = ["age", "education-num", "hours-per-week", 'workclass', 'education
 X = whole_df.loc[:, new_feature]
 y = whole_df.loc[:, 'income'].astype(int)  
 
-# 2️⃣ Διαχωρισμός σε Training (60%), Validation (10%), Test (30%)
-X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.40, random_state=42)  # 60% training
-X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.75, random_state=42)  # 10% val, 30% test
-
-# 4️⃣ Δημιουργία Νευρωνικού Δικτύου MLP
+# turning our da ta to float 32 type to be compatible with tensor
+X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.40, random_state=42)  
+X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.75, random_state=42)
+X_train = X_train.astype(np.float32)
+y_train = y_train.astype(np.float32)
+X_temp=X_temp.astype(np.float32)
+y_temp=y_temp.astype(np.float32)
+X_test=X_test.astype(np.float32)
+y_test=y_test.astype(np.float32)
+X_val = X_val.astype(np.float32)
+y_val = y_val.astype(np.float32)
 def create_model(hidden_layer_1, hidden_layer_2):
     model = tf.keras.Sequential([
-        tf.keras.layers.Dense(hidden_layer_1, activation='relu', input_shape=(X_train.shape[1],)),  # 1η κρυφή στοιβάδα
-        tf.keras.layers.Dense(hidden_layer_2, activation='relu'),  # 2η κρυφή στοιβάδα
-        tf.keras.layers.Dense(1, activation='sigmoid')  # Στοιβάδα εξόδου για binary classification
+        tf.keras.layers.Dense(hidden_layer_1, activation='relu', input_shape=(X_train.shape[1],)),  
+        tf.keras.layers.Dense(hidden_layer_2, activation='relu'), 
+        tf.keras.layers.Dense(1, activation='sigmoid')  
     ])
     model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
     return model
-
-# 5️⃣ Πειραματισμός με διαφορετικούς αριθμούς νευρώνων
 hidden_layer_configs = [
-    (16, 8),  # Μικρότερο δίκτυο
-    (32, 16),  # Μεσαίο δίκτυο
-    (64, 32)   # Μεγαλύτερο δίκτυο
+    (16, 8),  
+    (32, 16), 
+    (64, 32)   
 ]
-
 results = []
-
 for config in hidden_layer_configs:
     print(f"\n🔹 Training MLP with {config[0]}-{config[1]} hidden neurons...")
-    
-    # Δημιουργία και εκπαίδευση μοντέλου
     model = create_model(*config)
-    history = model.fit(X_train, y_train, epochs=20, batch_size=32, 
-                        validation_data=(X_val, y_val), verbose=1)
-    
-    # Αξιολόγηση στο Test Set
-    y_pred = (model.predict(X_test) > 0.5).astype("int32")  # Binary Classification
+    model.fit(X_train, y_train, epochs=20, batch_size=32, validation_data=(X_val, y_val))
+    y_pred = (model.predict(X_test) > 0.5).astype("int32")  
     accuracy = accuracy_score(y_test, y_pred)
-    
-    # Αποθήκευση αποτελεσμάτων
     results.append({"Model": f"MLP_{config[0]}-{config[1]}", "Accuracy": accuracy})
-    
-    # 📊 Οπτικοποίηση Loss Function
+
     plt.figure(figsize=(6, 4))
-    plt.plot(history.history['loss'], label='Train Loss')
+    plt.plot(history.history['accuracy'], label='Accuracy')
     plt.plot(history.history['val_loss'], label='Validation Loss')
     plt.xlabel("Epochs")
     plt.ylabel("Loss")
     plt.title(f"Loss Curve - MLP {config[0]}-{config[1]}")
     plt.legend()
     plt.show()
-
-# 6️⃣ Σύνοψη Αποτελεσμάτων
 results_df = pd.DataFrame(results)
 print("\n📊 Final Model Comparison:")
 print(results_df)
