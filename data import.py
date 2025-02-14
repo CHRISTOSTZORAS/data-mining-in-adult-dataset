@@ -88,6 +88,16 @@ zero_count = (whole_df['capital-loss'] == 0).sum()
 
 #LETS CHECK COLUMN hours-per-week
 whole_df['hours-per-week'].unique()
+if "hours-per-week" in whole_df.columns:
+    high_hours = whole_df[whole_df["hours-per-week"] > 147]
+    
+    if not high_hours.empty:
+        print("Υπάρχουν τιμές πάνω από 147:")
+        print(high_hours)
+    else:
+        print("Δεν υπάρχουν τιμές πάνω από 147.")
+else:
+    print("Η στήλη 'hours per week' δεν υπάρχει στο αρχείο.")
 
 #LETS CHECK COLUMN native-country
 whole_df['native-country'].unique()
@@ -276,29 +286,29 @@ X_pca = pca.fit_transform(X_clustering)
 fig, axes = plt.subplots(len(cluster_numbers), 2, figsize=(14, 6 * len(cluster_numbers)))
 
 for idx, k in enumerate(cluster_numbers):
-    # K-Means Clustering
+    # K-Means 
     kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
     kmeans_labels = kmeans.fit_predict(X_clustering)
     silhouette_kmeans = silhouette_score(X_clustering, kmeans_labels)  # FIXED
 
-    # Agglomerative Clustering
+    # Agglomerative 
     agglo = AgglomerativeClustering(n_clusters=k)
     agglo_labels = agglo.fit_predict(X_clustering)
     silhouette_agglo = silhouette_score(X_clustering, agglo_labels)
 
-    # Store silhouette scores
+    # silhouette scores
     silhouette_scores["Algorithm"].extend(["K-Means", "Agglomerative"])
     silhouette_scores["Clusters"].extend([k, k])
     silhouette_scores["Silhouette Score"].extend([silhouette_kmeans, silhouette_agglo])
 
-    # Scatter plot for K-Means
+    # ploting K-Means
     sns.scatterplot(x=X_pca[:, 0], y=X_pca[:, 1], hue=kmeans_labels, palette="viridis", ax=axes[idx, 0], s=10)
     axes[idx, 0].set_title(f"K-Means Clustering with k={k}\nSilhouette Score: {silhouette_kmeans:.4f}")
     axes[idx, 0].set_xlabel("Principal Component 1")
     axes[idx, 0].set_ylabel("Principal Component 2")
     axes[idx, 0].legend(title="Clusters")
 
-    # Scatter plot for Agglomerative Clustering
+    # ploting Agglomerative 
     sns.scatterplot(x=X_pca[:, 0], y=X_pca[:, 1], hue=agglo_labels, palette="magma", ax=axes[idx, 1], s=10)
     axes[idx, 1].set_title(f"Agglomerative Clustering with k={k}\nSilhouette Score: {silhouette_agglo:.4f}")
     axes[idx, 1].set_xlabel("Principal Component 1")
@@ -307,21 +317,19 @@ for idx, k in enumerate(cluster_numbers):
 
 plt.tight_layout()
 plt.show()
-
-# Convert silhouette scores to DataFrame
 results_df = pd.DataFrame(silhouette_scores)
 print(results_df)
 
 
 ###FORTH EXERCISE###
 
-# 1️⃣ Define features and target
 new_feature = ["age", "education-num", "hours-per-week", 'workclass', 'education', 
                'marital-status', 'occupation', 'relationship', 'race', 'sex', 
                'native-country', 'capital-gain', 'capital-loss']
 X = whole_df.loc[:, new_feature]  
 y = whole_df.loc[:, 'income'].astype(int)  
 
+#spliting ddataset
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 models = {
     "Logistic Regression": LogisticRegression(),
@@ -330,15 +338,17 @@ models = {
     "Gradient Boosting": GradientBoostingClassifier()
 }
 results = []
+
+#training
 for model_name, model in models.items():
-    print(f"\n🔹 Training {model_name}...")
+    print(f"\n Training {model_name}...")
     model.fit(X_train, y_train)
     y_pred = model.predict(X_test)
     cm = confusion_matrix(y_test, y_pred)
     print(f"\nConfusion Matrix - {model_name}:\n", cm)
-
+    #ploting
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["<=50K", ">50K"])
-    disp.plot(cmap="Blues", values_format="d") 
+    disp.plot(cmap="Reds", values_format="d") 
     plt.title(f"Confusion Matrix - {model_name}")
     plt.show()
     accuracy = accuracy_score(y_test, y_pred)
@@ -347,22 +357,19 @@ for model_name, model in models.items():
     f1 = classification_report(y_test, y_pred, output_dict=True)["weighted avg"]["f1-score"]
     results.append({"Model": model_name, "Accuracy": accuracy, "Precision": precision, "Recall": recall, "F1-Score": f1})
 machine_learning_results_df = pd.DataFrame(results)
-print("\n📊 Final Results Summary:")
+print("\nFinal Results Summary:")
 print(machine_learning_results_df)
 
 # making some extra experiments 
 gb_versions = {
     "GB_n_estimators_100": GradientBoostingClassifier(n_estimators=100),
     "GB_n_estimators_300": GradientBoostingClassifier(n_estimators=300), 
-    "GB_n_estimators_500": GradientBoostingClassifier(n_estimators=500), 
 
     "GB_max_depth_3": GradientBoostingClassifier(max_depth=3), 
     "GB_max_depth_5": GradientBoostingClassifier(max_depth=5), 
-    "GB_max_depth_7": GradientBoostingClassifier(max_depth=7), 
 
     "GB_learning_rate_0.1": GradientBoostingClassifier(learning_rate=0.1),
     "GB_learning_rate_0.05": GradientBoostingClassifier(learning_rate=0.05), 
-    "GB_learning_rate_0.01": GradientBoostingClassifier(learning_rate=0.01)  
 }
 results = []
 for version_name, model in gb_versions.items():
@@ -374,7 +381,7 @@ for version_name, model in gb_versions.items():
     print(f"\nConfusion Matrix - {version_name}:\n", cm)
 
     disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["<=50K", ">50K"])
-    disp.plot(cmap="Blues", values_format="d")  
+    disp.plot(cmap="Reds", values_format="d")  
     plt.title(f"Confusion Matrix - {version_name}")
     plt.show()
 
@@ -385,10 +392,10 @@ for version_name, model in gb_versions.items():
     results.append({"Model": version_name, "Accuracy": accuracy, "Precision": precision, "Recall": recall, "F1-Score": f1})
 
 machine_learning_results_df = pd.DataFrame(results)
-print("\n📊 Final Results Summary:")
+print("\n Final Results Summary:")
 print(machine_learning_results_df)
 
-###Fifth EXERCISE###
+###FIFTH EXERCISE###
 
 new_feature = ["age", "education-num", "hours-per-week", 'workclass', 'education', 
                'marital-status', 'occupation', 'relationship', 'race', 'sex', 
@@ -397,17 +404,19 @@ new_feature = ["age", "education-num", "hours-per-week", 'workclass', 'education
 X = whole_df.loc[:, new_feature]
 y = whole_df.loc[:, 'income'].astype(int)  
 
-# turning our da ta to float 32 type to be compatible with tensor
-X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.40, random_state=42)  
+#splitting
+X_train, X_temp, y_train, y_temp = train_test_split(X, y, test_size=0.40, random_state=42)
 X_val, X_test, y_val, y_test = train_test_split(X_temp, y_temp, test_size=0.75, random_state=42)
 X_train = X_train.astype(np.float32)
 y_train = y_train.astype(np.float32)
-X_temp=X_temp.astype(np.float32)
-y_temp=y_temp.astype(np.float32)
-X_test=X_test.astype(np.float32)
-y_test=y_test.astype(np.float32)
+X_temp = X_temp.astype(np.float32)
+y_temp = y_temp.astype(np.float32)
+X_test = X_test.astype(np.float32)
+y_test = y_test.astype(np.float32)
 X_val = X_val.astype(np.float32)
 y_val = y_val.astype(np.float32)
+
+#function for multiple experiments
 def create_model(hidden_layer_1, hidden_layer_2):
     model = tf.keras.Sequential([
         tf.keras.layers.Dense(hidden_layer_1, activation='relu', input_shape=(X_train.shape[1],)),  
@@ -419,28 +428,45 @@ def create_model(hidden_layer_1, hidden_layer_2):
 hidden_layer_configs = [
     (16, 8),  
     (32, 16), 
-    (64, 32)   
+    (64, 32),
+    (128,64)  
 ]
 results = []
+training_histories = {} 
+
+#training
 for config in hidden_layer_configs:
-    print(f"\n🔹 Training MLP with {config[0]}-{config[1]} hidden neurons...")
+    print(f"\n Training MLP with {config[0]}-{config[1]} hidden neurons...")
     model = create_model(*config)
-    model.fit(X_train, y_train, epochs=20, batch_size=32, validation_data=(X_val, y_val))
+    
+    history = model.fit(X_train, y_train, epochs=50, batch_size=32, validation_data=(X_val, y_val), verbose=0)
+    training_histories[f"MLP_{config[0]}-{config[1]}"] = history.history
+    
     y_pred = (model.predict(X_test) > 0.5).astype("int32")  
     accuracy = accuracy_score(y_test, y_pred)
     results.append({"Model": f"MLP_{config[0]}-{config[1]}", "Accuracy": accuracy})
 
-    plt.figure(figsize=(6, 4))
-    plt.plot(history.history['accuracy'], label='Accuracy')
-    plt.plot(history.history['val_loss'], label='Validation Loss')
-    plt.xlabel("Epochs")
-    plt.ylabel("Loss")
-    plt.title(f"Loss Curve - MLP {config[0]}-{config[1]}")
-    plt.legend()
+    fig, ax = plt.subplots(1, 2, figsize=(12, 4))
+    # Accuracy Plot
+    ax[0].plot(history.history['accuracy'], label='Training Accuracy')
+    ax[0].plot(history.history['val_accuracy'], label='Validation Accuracy')
+    ax[0].set_xlabel("Epochs")
+    ax[0].set_ylabel("Accuracy")
+    ax[0].set_title(f"Accuracy Curve - MLP {config[0]}-{config[1]}")
+    ax[0].legend()
+
+    # Loss Plot
+    ax[1].plot(history.history['loss'], label='Training Loss')
+    ax[1].plot(history.history['val_loss'], label='Validation Loss')
+    ax[1].set_xlabel("Epochs")
+    ax[1].set_ylabel("Loss")
+    ax[1].set_title(f"Loss Curve - MLP {config[0]}-{config[1]}")
+    ax[1].legend()
+
     plt.show()
 results_df = pd.DataFrame(results)
-print("\n📊 Final Model Comparison:")
 print(results_df)
+
 
 
 
