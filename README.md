@@ -2,9 +2,6 @@
 
 ## Απαλλακτική Εργασία
 
-**Χρήστος Τζώρας**  
-ΑΜ: ΜΕΣ23006  
-Email: christzoras1652000@gmail.com  
 
 ---
 
@@ -105,7 +102,3 @@ Email: christzoras1652000@gmail.com
 - Σημειώσεις και διαφάνειες του μαθήματος
 - **Github** (αποθετήρια σχετικών έργων)
 - **Stack Overflow** (επίλυση προβλημάτων και βελτιστοποίηση κώδικα)
-- AI Coding Tools όπως:
-  - **OpenAI ChatGPT**
-  - **GitHub Copilot**
-  - **DeepMind AlphaCode**
