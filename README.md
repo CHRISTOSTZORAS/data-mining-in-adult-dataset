@@ -101,10 +101,6 @@ For the completion of this project, we relied on the following sources:
 - **Lecture notes and slides** from the course
 - **GitHub** (repositories related to similar projects)
 - **Stack Overflow** (troubleshooting and code optimization)
-- **AI-powered coding tools**, such as:
-  - **OpenAI ChatGPT**
-  - **GitHub Copilot**
-  - **DeepMind AlphaCode**
 
 This project provided hands-on experience in applying data mining and machine learning techniques on real-world datasets, enhancing our skills in statistical analysis and programming.
 
